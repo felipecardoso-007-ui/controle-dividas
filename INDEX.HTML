@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Dívidas - Dashboard</title>
+<meta name="theme-color" content="#343541">
+<style>
+body {margin:0;font-family:'Segoe UI',sans-serif;background:#343541;color:#ececec;overflow-x:hidden;min-height:100vh;}
+* {scrollbar-width: thin; scrollbar-color: #565869 transparent;}
+*::-webkit-scrollbar{width:8px;}
+*::-webkit-scrollbar-thumb{background:#565869;border-radius:10px;}
+*::-webkit-scrollbar-thumb:hover{background:#6b6e7c;}
+.sidebar {position:fixed;top:70px;left:0;width:260px;height:calc(100% - 70px);background:rgba(32,33,35,0.95);color:white;flex-direction:column;border-right:1px solid rgba(255,255,255,0.1);overflow-y:auto;transform:translateX(-100%);z-index:1001;transition:transform 0.25s ease-in-out;}
+.sidebar.show{transform:translateX(0);}
+.sidebar h2{font-size:1.2em;font-weight:bold;padding:16px;margin:0;border-bottom:1px solid rgba(255,255,255,0.1);cursor:pointer;}
+.devedores-list{list-style:none;margin:0;padding:0;}
+.devedores-list li{margin:6px 8px;padding:12px 16px;cursor:pointer;border-radius:12px;transition:background 0.2s;}
+.devedores-list li:hover{background:rgba(255,255,255,0.1);}
+.devedores-list li.active{background:rgba(255,255,255,0.2);font-weight:600;}
+.sidebar-footer{padding:12px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:center;}
+.footer-card{display:flex;flex-direction:column;gap:8px;width:90%;align-items:center;margin-top:auto;}
+.chatgpt-btn{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;background:#444654;color:#ececec;border:none;font-size:1em;cursor:pointer;transition:0.2s;width:100%;justify-content:center;}
+.chatgpt-btn:hover{background:#565869;transform:scale(1.03);}
+.sidebar-overlay{position:fixed;top:70px;left:0;width:100%;height:calc(100% - 70px);background:rgba(0,0,0,0.4);z-index:1000;opacity:0;display:none;transition:opacity 0.25s ease-in-out;}
+.sidebar-overlay.show{display:block;opacity:1;}
+.menu-toggle{display:flex;position:fixed;top:12px;left:12px;z-index:1003;width:50px;height:50px;border-radius:50%;border:none;background:#444654;color:#ececec;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:0.2s;}
+.menu-toggle:hover{background:#565869;}
+@keyframes subtle-pulse {0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); }}
+.menu-toggle.pulse { animation: subtle-pulse 2.5s ease-in-out infinite; transition: transform 0.2s; }
+.main{padding:80px 10px 20px 10px;display:flex;justify-content:center;align-items:center;flex-direction:column;min-height:calc(100vh - 70px);overflow:hidden;}
+.dashboard{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:400px;}
+#welcome-wrapper{display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;}
+#welcome-text span{display:block;opacity:0;transform:translateY(-20px);font-size:1.3em;margin:6px 0;transition:all 0.5s ease;}
+.header-devedor{font-size:1.6em;font-weight:bold;margin-bottom:16px;color:#fff;background:#444654;padding:12px 16px;border-radius:12px;text-align:center;width:100%;box-sizing:border-box;}
+.mini-card,.divida-item{width:100%;background:#444654;border-radius:12px;padding:14px;box-shadow:0 4px 12px rgba(0,0,0,0.25);opacity:0;transform:translateY(30px);transition:transform 0.5s ease, opacity 0.5s ease;}
+.mini-card.show,.divida-item.show{opacity:1;transform:translateY(0);}
+.divida-top{display:flex;justify-content:space-between;align-items:center;}
+.status{padding:3px 8px;border-radius:8px;font-weight:600;font-size:0.85em;}
+.valor-parcela{background:#19c37d;color:white;padding:2px 6px;border-radius:8px;font-weight:bold;font-size:0.85em;}
+.divida-actions{display:flex;gap:6px;margin-top:8px;}
+.divida-actions button{flex:1;padding:10px;border:none;border-radius:8px;background:#565869;color:#ececec;font-weight:600;cursor:pointer;transition:0.2s;}
+.divida-actions button:hover{background:#6b6e7c;transform:scale(1.05);}
+.modal{display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1002;opacity:0;pointer-events:none;transition:0.3s;}
+.modal.show{opacity:1;pointer-events:auto;}
+.modal-content{background:#343541;color:#ececec;border-radius:12px;padding:15px;width:95%;max-width:400px;max-height:90vh;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
+.modal-content input,.modal-content select{width:100%;padding:10px;border-radius:8px;background:#4a4c5a;border:1px solid #565869;color:#ececec;margin-bottom:5px;box-sizing:border-box;}
+.wizard-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}
+.wizard-tabs .tab{flex:1;text-align:center;padding:6px;border-radius:8px;background:#444654;cursor:pointer;}
+.wizard-tabs .tab.active{background:#565869;font-weight:bold;}
+.step{display:none;flex-direction:column;}
+.step.active{display:flex;}
+.step-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.step-buttons button{flex:1;padding:10px;border:none;border-radius:8px;font-weight:600;cursor:pointer;}
+.btn-save{background:#19c37d;color:white;}
+.btn-cancel{background:#ef4146;color:white;}
+.close{cursor:pointer;font-size:1.3em;align-self:flex-end;}
+</style>
+</head>
+<body>
+
+<button class="menu-toggle pulse" id="menu-toggle">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<aside class="sidebar">
+  <h2 id="header-devedores">Devedores</h2>
+  <ul class="devedores-list"></ul>
+  <div class="sidebar-footer">
+    <div class="footer-card">
+      <button class="chatgpt-btn" id="add-btn">Adicionar Dívida</button>
+      <button class="chatgpt-btn" id="export-btn">Exportar</button>
+      <button class="chatgpt-btn" id="import-btn">Importar</button>
+      <input type="file" id="import-file" style="display:none" accept=".json">
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="dashboard" id="dashboard"></div>
+</main>
+
+<div class="modal" id="modal-divida">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <div class="wizard-tabs">
+      <div class="tab active" data-step="1">Item</div>
+      <div class="tab" data-step="2">Banco</div>
+      <div class="tab" data-step="3">Devedor</div>
+      <div class="tab" data-step="4">Parcelamento</div>
+      <div class="tab" data-step="5">Vencimento</div>
+    </div>
+    <div class="step step-1 active">
+      <label>Item:</label>
+      <input type="text" class="field" data-key="item" placeholder="Ex.: Conta de luz">
+      <label>Valor:</label>
+      <input type="number" class="field" data-key="valor" step="0.01" min="0.01">
+    </div>
+    <div class="step step-2">
+      <label>Banco:</label>
+      <input type="text" class="field" data-key="banco" placeholder="Ex.: Nubank">
+    </div>
+    <div class="step step-3">
+      <label>Devedor:</label>
+      <input type="text" class="field" data-key="devedor" placeholder="Ex.: João">
+      <label>Salário:</label>
+      <input type="number" id="input-salario" step="0.01" min="0" value="0">
+    </div>
+    <div class="step step-4">
+      <label>Parcela Atual:</label>
+      <input type="number" class="field" data-key="parcelaAtual" value="1" min="1">
+      <label>Total de Parcelas:</label>
+      <input type="number" class="field" data-key="totalParcelas" value="1" min="1">
+    </div>
+    <div class="step step-5">
+      <label>Vencimento:</label>
+      <input type="date" class="field" data-key="vencimentoFatura">
+    </div>
+    <div class="step-buttons">
+      <button class="prev-btn">← Anterior</button>
+      <button class="next-btn">Próximo →</button>
+      <button class="btn-save">Salvar</button>
+      <button class="btn-cancel">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* --- Service Worker PWA --- */
+if('serviceWorker' in navigator){
+  const swBlob = new Blob([`
+    const CACHE_NAME='dividas-cache-v1';
+    const urlsToCache=['/'];
+    self.addEventListener('install', e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(urlsToCache)));});
+    self.addEventListener('fetch', e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});
+  `],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+    .then(()=>console.log('SW registrado'))
+    .catch(()=>console.log('Falha no SW'));
+}
+
+/* --- Menu Toggle --- */
+const sidebar = document.querySelector('.sidebar');
+const overlay = document.getElementById('sidebar-overlay');
+const toggle = document.getElementById('menu-toggle');
+toggle.addEventListener('click', ()=>{
+  sidebar.classList.toggle('show'); overlay.classList.toggle('show');
+  if(sidebar.classList.contains('show')) toggle.classList.remove('pulse');
+  else toggle.classList.add('pulse');
+});
+
+/* --- App --- */
+const App = {
+  dividas: JSON.parse(localStorage.getItem("dividasDaCasa"))||[],
+  saldosDevedores: JSON.parse(localStorage.getItem("saldosDevedores"))||{},
+  devedorSelecionado:null,
+  sidebarList: document.querySelector(".devedores-list"),
+  dashboard: document.getElementById("dashboard"),
+  modal: document.getElementById("modal-divida"),
+  fields:[...document.querySelectorAll(".field")],
+  editIndex:null,
+  currentStep:1,
+  init(){this.renderSidebar(); this.bindUI(); this.renderDashboard();},
+  bindUI(){
+    document.getElementById("add-btn").onclick = ()=>this.showModal();
+    this.modal.querySelector(".close").onclick = ()=>this.hideModal();
+    this.modal.querySelector(".btn-cancel").onclick = ()=>this.hideModal();
+    this.modal.querySelector(".btn-save").onclick = ()=>this.saveDivida();
+    document.getElementById("export-btn").onclick = ()=>this.exportData();
+    document.getElementById("import-btn").onclick = ()=>document.getElementById("import-file").click();
+    document.getElementById("import-file").onchange = e=>this.importData(e);
+    this.modal.querySelector('.next-btn').onclick = ()=>{ if(this.currentStep<5)this.showStep(this.currentStep+1); };
+    this.modal.querySelector('.prev-btn').onclick = ()=>{ if(this.currentStep>1)this.showStep(this.currentStep-1); };
+    document.querySelectorAll('.wizard-tabs .tab').forEach(tab=>{ tab.onclick = ()=>this.showStep(parseInt(tab.dataset.step)); });
+    document.getElementById('header-devedores').onclick = ()=>{this.devedorSelecionado=null;this.renderSidebar();this.renderDashboard(); sidebar.classList.remove('show'); overlay.classList.remove('show');};
+  },
+  showStep(n){this.currentStep=n;document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));document.querySelector(`.step-${n}`).classList.add('active');document.querySelectorAll('.wizard-tabs .tab').forEach(t=>t.classList.remove('active'));document.querySelector(`.wizard-tabs .tab[data-step="${n}"]`).classList.add('active');},
+  capitalizeName(name){return name.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');},
+  renderSidebar(){
+    const devedores=[...new Set(this.dividas.map(d=>d.devedor))];
+    this.sidebarList.innerHTML=devedores.map(dev=>`<li data-dev="${dev}" class="${this.devedorSelecionado===dev?'active':''}">${this.capitalizeName(dev)}</li>`).join('');
+    this.sidebarList.querySelectorAll("li").forEach(li=>{
+      li.onclick = ()=>{this.devedorSelecionado=li.dataset.dev;this.renderSidebar();this.renderDashboard(); sidebar.classList.remove('show'); overlay.classList.remove('show');};
+    });
+  },
+  renderDashboard(){
+    this.dashboard.innerHTML='';
+    if(!this.devedorSelecionado){this.dashboard.innerHTML=`<div id="welcome-wrapper"><div id="welcome-text"></div></div>`;startTyping();return;}
+    const headerText=this.capitalizeName(this.devedorSelecionado);
+    this.dashboard.innerHTML=`<div class="header-devedor">${headerText}</div>`;
+    const lista=this.dividas.filter(d=>d.devedor===this.devedorSelecionado);
+    const salario=this.saldosDevedores[this.devedorSelecionado]||0;
+    const totalPago=lista.reduce((a,d)=>a+(d.paga?(d.valor/d.totalParcelas):0),0);
+    const atrasado=lista.filter(d=>new Date(d.vencimentoFatura)<new Date()&&!d.paga).reduce((a,d)=>a+(d.valor/d.totalParcelas),0);
+    const saldo=salario-totalPago;
+    this.dashboard.innerHTML+=`<div class="mini-card show"><div>Salário: ${salario.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div><div>Total Pago: ${totalPago.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div><div>Saldo: ${saldo.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div><div>Atrasado: ${atrasado.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div></div>`;
+    lista.forEach(d=>{
+      const idx=this.dividas.indexOf(d);
+      const vp=d.totalParcelas>1?d.valor/d.totalParcelas:d.valor;
+      const diff=Math.ceil((new Date(d.vencimentoFatura)-new Date())/(1000*60*60*24));
+      let cor=d.paga?"#19c37d":diff<0?"#ef4146":diff===0?"#f7c948":"#565869";
+      let texto=d.paga?"Pago":diff<0?`Atrasada (${Math.abs(diff)} dia(s))`:diff===0?"Vence Hoje":`Faltam ${diff} dia(s)`;
+      this.dashboard.innerHTML+=`<div class="divida-item show" data-idx="${idx}"><div class="divida-top"><span>${d.item}</span><span class="status" style="background:${cor}">${texto}</span></div><div>Total: ${d.valor.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} ${d.totalParcelas>1?`<span class="valor-parcela">${vp.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span>`:''}</div><div>Parcelas: ${d.parcelaAtual}/${d.totalParcelas}</div><div>Banco: ${d.banco||'Não informado'}</div><div>Vencimento: ${d.vencimentoFatura}</div><div class="divida-actions"><button class="btn-pago">${d.paga?'Desmarcar':'Marcar Pago'}</button><button class="btn-editar">Editar</button><button class="btn-excluir">Excluir</button></div></div>`;
+    });
+    this.dashboard.querySelectorAll(".divida-item").forEach((item,i)=>{
+      item.querySelector(".btn-pago").onclick=()=>{this.dividas[i].paga=!this.dividas[i].paga;this.save();};
+      item.querySelector(".btn-editar").onclick=()=>{this.editDivida(i);};
+      item.querySelector(".btn-excluir").onclick=()=>{if(confirm("Excluir?")){this.dividas.splice(i,1);this.save();}};
+    });
+  },
+  showModal(){this.modal.classList.add("show");this.showStep(1);},
+  hideModal(){this.modal.classList.remove("show");this.editIndex=null;this.fields.forEach(f=>{f.value=f.type==='number'?1:'';});document.getElementById('input-salario').value=0;},
+  saveDivida(){
+    const obj={}; this.fields.forEach(f=>obj[f.dataset.key]=f.type==='number'?parseFloat(f.value||0):f.value.trim());
+    if(!obj.item||!obj.valor||!obj.devedor||!obj.vencimentoFatura){alert('Preencha todos os campos!');return;}
+    if(obj.totalParcelas<obj.parcelaAtual||obj.totalParcelas<=0){alert('Parcelas inválidas!');return;}
+    obj.devedor=this.capitalizeName(obj.devedor);
+    this.saldosDevedores[obj.devedor]=parseFloat(document.getElementById('input-salario').value)||0;
+    const idx=this.dividas.findIndex(d=>d.devedor===obj.devedor&&d.item===obj.item);
+    if(idx>=0){this.dividas[idx]=obj;}else{this.dividas.push(obj);}
+    this.save(); this.hideModal();
+  },
+  editDivida(idx){
+    const d=this.dividas[idx]; this.editIndex=idx;
+    this.fields.forEach(f=>{ f.value=d[f.dataset.key]!==undefined?d[f.dataset.key]:''; });
+    document.getElementById('input-salario').value=this.saldosDevedores[d.devedor]||0;
+    this.showModal();
+  },
+  save(){localStorage.setItem("dividasDaCasa",JSON.stringify(this.dividas));localStorage.setItem("saldosDevedores",JSON.stringify(this.saldosDevedores));this.renderSidebar();this.renderDashboard();},
+  exportData(){const b=new Blob([JSON.stringify({dividas:this.dividas,saldosDevedores:this.saldosDevedores},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='dados_dividas.json';a.click();},
+  importData(e){
+    const f = e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if(!data.dividas && !data.saldosDevedores){ alert('Arquivo inválido!'); return; }
+        if(Array.isArray(data.dividas)) this.dividas = data.dividas;
+        if(typeof data.saldosDevedores==='object' && data.saldosDevedores!==null) this.saldosDevedores = data.saldosDevedores;
+        this.save(); alert('Dados importados com sucesso!');
+      } catch { alert('Arquivo inválido! Certifique-se de que é um JSON correto.'); }
+    };
+    reader.readAsText(f);
+  }
+};
+
+function startTyping(){
+  const wrapper=document.getElementById('welcome-text'); if(!wrapper)return; wrapper.innerHTML='';
+  const lines=["Bem-vindo ao Controle de Dívidas","Gerencie suas finanças em um só lugar"];
+  let lineIndex=0;
+  function typeLine(){if(lineIndex>=lines.length)return;
+    const words=lines[lineIndex].split(' ');
+    words.forEach((word,idx)=>{
+      const span=document.createElement('span');span.textContent=word;span.style.display='block';span.style.opacity='0';span.style.transform='translateY(-20px)';span.style.transition='all 0.5s ease';wrapper.appendChild(span);
+      setTimeout(()=>{span.style.opacity='1';span.style.transform='translateY(0)';}, idx*300);
+    });
+    setTimeout(()=>{lineIndex++;typeLine();}, words.length*300+300);
+  }
+  typeLine();
+}
+
+document.addEventListener("DOMContentLoaded",()=>{App.init();});
+</script>
+</body>
+</html>
